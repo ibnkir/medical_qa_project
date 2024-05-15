@@ -26,38 +26,20 @@
 * app - код FastAPI и Streamlit приложений.
 
 ### Как воспользоваться репозиторием:
-* Убедитесь, что на вашем компьютере установлен Python и все необходимые пакеты (см. файл requirements.txt).
-* Развертывание репозитория без докера:
-   1. Склонировать репозиторий на ваш компьютер
-      ```bash
-      git clone https://github.com/ibnkir/medical_qa_project.git
-      ```
-   2. Перейти в подпапку `app` проекта
-      ```bash
-      cd ./medical_qa_project/app
-       ```
-   3. Запустить серверную часть (если порт 8081 уже занят, то заменить его на другой)
-      ```bash
-      uvicorn fastapi_app:app --reload --port 8081 --host 0.0.0.0
-      ```
-   4. Запустить клиентскую часть
-      ```bash
-      streamlit run streamlit_app.py
-      ```
-* Развертывание репозитория в докере:
-   1. Склонировать репозиторий на ваш компьютер
-      ```bash
-      git clone https://github.com/ibnkir/medical_qa_project.git
-      ```
-   2. Перейти в подпапку `app` проекта
-      ```bash
-      cd ./medical_qa_project/app
-       ```
-   3. Запустить серверную часть (если порт 8081 уже занят, то заменить его на другой)
-      ```bash
-      uvicorn fastapi_app:app --reload --port 8081 --host 0.0.0.0
-      ```
-   4. Запустить клиентскую часть
-      ```bash
-      streamlit run streamlit_app.py
-      ```
+0. Убедитесь, что на вашем компьютере установлен Python и все необходимые пакеты (см. файл requirements.txt).
+1. Склонировать репозиторий на ваш компьютер
+  ```bash
+  git clone https://github.com/ibnkir/medical_qa_project.git
+  ```
+2. Перейти в подпапку `app` проекта
+  ```bash
+  cd ./medical_qa_project/app
+   ```
+3. Запустить серверную часть (если порт 8081 уже занят, то заменить его на другой)
+  ```bash
+  uvicorn fastapi_app:app --reload --port 8081 --host 0.0.0.0
+  ```
+4. Запустить клиентскую часть
+  ```bash
+  streamlit run streamlit_app.py
+  ```
