@@ -161,3 +161,4 @@ cython_debug/
 
 # KN modifications
 data/
+models/catboost_info/
