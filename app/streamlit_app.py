@@ -14,19 +14,19 @@ import pandas as pd
 st.title('Similar Medical Questions Search')
 st.write(f"### {'Enter your question in English and how many similar medical questions to find:'}")
 
-user_text = st.text_area("Your question (100 characters limit): ", 
+user_text = st.text_area("Your question (150 characters limit): ", 
                          value="How do I check my blood sugar?", 
-                         max_chars=100, 
+                         max_chars=150, 
                          key="input")
 
-questions_num = st.number_input('Number of similar questions to find (20 questions limit):',
+questions_num = st.number_input('Number of similar medical questions to find (20 questions limit):',
                                 min_value=1, 
                                 max_value=20, 
                                 value=10, 
                                 step=1)
 
 cls_option = st.selectbox(
-    "Select your classifier:",
+    "Select your classifier (without GPU BERT takes too much time):",
     ("None", "CatBoostClassifier", "Fine-tuned BERT"))
 
 if st.button('Search') and user_text:

@@ -1,5 +1,5 @@
 """Класс SentencePairClassifier и вспомогательные функции для работы с 
-классификатором на основе дообученной BERT-модели.
+классификатором на основе дообученной BERT-модели с добавленным линейным слоем.
 """
 
 import numpy as np
@@ -49,7 +49,7 @@ class CustomDataset(Dataset):
         self.data = data  # Pandas Dataframe
         self.tokenizer = AutoTokenizer.from_pretrained(bert_model) 
         self.max_len = max_len # Максимальная суммарная длина двух текстов
-        self.with_labels = with_labels # True для обучения/валидации/тестирования, False для инференса, когда нет меток
+        self.with_labels = with_labels # True для обучения, False для инференса
 
     def __len__(self):
         return len(self.data)
@@ -77,14 +77,16 @@ class CustomDataset(Dataset):
 
 def get_bert_preds(net, device, data_loader, threshold=THRESHOLD):
     """
-    Функция для получения предсказаний.
+    Функция для получения предсказаний классификатора на основе 
+    дообученного BERT с добавленным линейным слоем.
     """
     net.eval()
 
     res_preds = []
     with torch.no_grad():
         for batch_id, (input_ids, attn_masks, token_type_ids) in enumerate(data_loader):
-            input_ids, attn_masks, token_type_ids = input_ids.to(device), attn_masks.to(device), token_type_ids.to(device)
+            input_ids, attn_masks, token_type_ids = \
+                input_ids.to(device), attn_masks.to(device), token_type_ids.to(device)
 
             logits = net(input_ids, attn_masks, token_type_ids)
             probs = torch.sigmoid(logits).squeeze(-1)
