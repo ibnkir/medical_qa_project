@@ -8,7 +8,7 @@ from sklearn.metrics import pairwise_distances
 from catboost import CatBoostClassifier
 from sentence_transformers import SentenceTransformer
 import time
-from sentence_pair_classifier import SentencePairClassifier, CustomDataset, get_bert_preds
+from bert_classifier import SentencePairClassifier, CustomDataset, get_bert_preds
 import torch
 from torch.utils.data import DataLoader, Dataset
 
