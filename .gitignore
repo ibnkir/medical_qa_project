@@ -162,6 +162,9 @@ cython_debug/
 # KN modifications
 data/
 models/
+<<<<<<< HEAD
 notebooks/catboost_info/
 app/__pycache__/
 
+=======
+>>>>>>> bd884cdface51b38517ad5316f129c74a41c19a6
