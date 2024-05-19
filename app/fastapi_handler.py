@@ -1,102 +1,110 @@
-"""Класс FastApiHandler, который обрабатывает запросы API.
+"""Класс FastApiHandler для обработки запросов API.
 
-Для тестирования можно ввести команду из терминала: python -m app.fastapi_handler
+Для тестирования перейти в папку app и выполнить команду
+python -m fastapi_handler
 """
 
+import os
+import numpy as np
+import pandas as pd
+from datasets import load_dataset
+from sklearn.metrics import pairwise_distances
 from catboost import CatBoostClassifier
 from sentence_transformers import SentenceTransformer
+import time
+from sentence_pair_classifier import SentencePairClassifier
+import torch
 
 
 class FastApiHandler:
-    """Класс FastApiHandler, который обрабатывает запросы и возвращает список похожих вопросов."""
+    """Класс FastApiHandler, обрабатывает запросы и возвращает список похожих вопросов."""
 
     def __init__(self, bert_model_name="all-MiniLM-L6-v2"):
         """Инициализация переменных класса.
         Args:
-            bert_model_name (str): Название используемой BERT-модели.
+            bert_model_name (str): Название используемой BERT-модели для векторизации текста.
         """
         self.bert_model_name = bert_model_name
         
         # Типы параметров запроса для проверки
         self.param_types = {
             "user_text": str,
-            "questions_num": int
+            "questions_num": int,
+            "cls_option": str
         }
         
-        self.prepare_data()
+        self.load_data()
         self.encode_all_questions()
-        self.load_question_pairs_classifier()
+        self.load_classifiers()
 
-    def prepare_data(self):
-        """Подготовка данных."""
-        
-        # Скачиваем датасет с парами вопросов
+    def load_data(self):
+        """Загрузка данных."""
+        os.makedirs("../data", exist_ok=True)
+
+        # Загружаем исходный датасет с парами вопросов
         try:
-            # Скачиваем из локального файла предобработанный датасет, если ранее сохраняли
+            # Скачиваем из локального файла, если ранее сохраняли
             self.data = pd.read_csv("../data/medical_questions_pairs.csv")
-            is_preproc_needed = False
         except:
-            # Скачиваем исходный датасет из Интернета
+            # Скачиваем из Интернета
             data = load_dataset("medical_questions_pairs", split="train")
             self.data = pd.DataFrame(data)
-            is_preproc_needed = True
+            self.data.to_csv("../data/medical_questions_pairs.csv", index=False)
 
-        
         # Создаем корпус вопросов
         try:
             # Скачиваем из локального файла, если ранее сохраняли
             self.questions = pd.read_csv("../data/medical_questions.csv")
         except:
             # Создаем на основе исходного датасета
-            self.questions = pd.DataFrame(pd.concat([data['question_1'], data['question_2']], axis=0).unique())
+            self.questions = pd.DataFrame(pd.concat([self.data['question_1'], self.data['question_2']], axis=0).unique())
             self.questions.reset_index(inplace=True)
             self.questions.rename(columns={'index': 'question_id', 0: 'question'}, inplace=True)    
-            # Сохраняем локально
-            os.makedirs("../data", exist_ok=True)
             self.questions.to_csv("../data/medical_questions.csv", index=False)
 
-        
-        # Если пары вопросов загружены не локально, а из Интернета, то добавляем id вопросов и сохраняем локально
-        if is_preproc_needed:
-            # Добавляем id к вопросам из 1-й колонки
-            self.data = pd.merge(self.data, self.questions, left_on='question_1', right_on='question', how='left')
-            self.data.rename(columns={'question_id': 'question_1_id'}, inplace=True)
-            self.data.drop(columns='question', inplace=True)
-            
-            # Добавляем id к вопросам из 2-й колонки
-            self.data = pd.merge(self.data, self.questions, left_on='question_2', right_on='question', how='left')
-            self.data.rename(columns={'question_id': 'question_2_id'}, inplace=True)
-            self.data.drop(columns='question', inplace=True)
-
-            # Сохраняем локально
-            os.makedirs("../data", exist_ok=True)
-            self.data.to_csv("../data/medical_questions_pairs.csv", index=False)
-        
     def encode_all_questions(self):
         """Векторизация корпуса вопросов с помощью BERT-модели."""
         self.bert_model = SentenceTransformer(self.bert_model_name)
-        self.bert_embeds = self.bert_model.encode(self.questions['question'], convert_to_tensor=False)
+        try:
+            # Скачиваем из локального файла, если ранее сохраняли
+            self.bert_embeds = np.load("../data/question_bert_embeds.npy")
+        except:
+            self.bert_embeds = self.bert_model.encode(self.questions['question'], convert_to_tensor=False)
+            with open('../data/question_bert_embeds.npy', 'wb') as f:
+                np.save(f, self.bert_embeds)
             
-    def load_question_pairs_classifier(self):
-        """Загрузка обученного классификатора пар вопросов."""
+    def load_classifiers(self):
+        """Загрузка обученных классификаторов пар вопросов."""
+        
+        # Пробуем загрузить CatBoost
         try:
             self.cb_cls_model = CatBoostClassifier()
-            self.cb_cls_model.load_model('../models/question_pairs_cb_classifier.bin')
-        
+            self.cb_cls_model.load_model('../models/question_pairs_cb_classifier.cbm')
         except Exception as e:
+            self.cb_cls_model = None
             print(f"Failed to load catboost question pairs classifier: {e}")
 
-    def find_close_embed_inds(self, query_embed, n=10):
+        # Пробуем загрузить BERT
+        try:
+            self.bert_cls_nn = SentencePairClassifier()
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            self.bert_cls_nn.load_state_dict(torch.load('../models/question_pairs_bert_classifier.pt', map_location=self.device))
+        except Exception as e:
+            self.bert_cls_nn = None
+            print(f"Failed to load bert question pairs classifier: {e}")
+
+    def find_similar_questions_inds(self, user_text, n, cls_option):
         """
         Поиск индексов n ближайших векторов.
         
-        Входные данные:
-            - query_embed - ndarray-вектор запрашиваемого вопроса,
-            - n - количество ближайших векторов, которое нужно найти.
+        Args:
+            - user_text (str): введенный пользователем текст,
+            - n (int): количество ближайших векторов, которое нужно найти.
         
-        Возвращаемое значение:
+        Returns:
             Список из n индексов ближайших векторов.
         """
+        query_embed = self.bert_model.encode(user_text, convert_to_tensor=False).reshape(1, -1)
         dists = pairwise_distances(query_embed, self.bert_embeds, metric='cosine').squeeze()
         
         # Если расстояние до самого близкого вопроса меньше определенного значения, 
@@ -105,14 +113,18 @@ class FastApiHandler:
             close_embed_inds = np.argsort(dists)[1:]
         else:
             close_embed_inds = np.argsort(dists)
-    
+
+        n = min(n, len(close_embed_inds))
+        
+        if cls_option == 'None':
+            return close_embed_inds[:n]
+            
         res_inds = []
         inds_labeled_0 = []
         cnt = 0
-        n = min(n, len(close_embed_inds))
-        
+                
         for idx in close_embed_inds:
-            close_embed = all_embeds[idx].reshape(1, -1)
+            close_embed = self.bert_embeds[idx].reshape(1, -1)
             
             left_pair = np.hstack([query_embed, close_embed])
             if self.cls_model.predict(left_pair)[0] == 1:
@@ -145,7 +157,7 @@ class FastApiHandler:
         Returns:
             bool: True — если есть нужные параметры, False — иначе
         """
-        if "user_text" not in query_params or "questions_num" not in query_params:
+        if "user_text" not in query_params or "questions_num" not in query_params or "cls_option" not in query_params:
             return False
 
         if not isinstance(query_params["user_text"], self.param_types["user_text"]):
@@ -153,38 +165,60 @@ class FastApiHandler:
 
         if not isinstance(query_params["questions_num"], self.param_types["questions_num"]):
             return False
+
+        if not isinstance(query_params["cls_option"], self.param_types["cls_option"]):
+            return False
         
         return True
-        
-              
+          
     def handle(self, query_params):
         """Функция для обработки входящих запросов по API. 
         Запрос состоит из текста вопроса и количества похожих на него вопросов, которое нужно найти.
 
         Args:
-            query_params (dict): Словарь параметров запроса.
+            - query_params (dict): Словарь параметров запроса.
 
         Returns:
             - **dict**: Словарь, содержащий результат выполнения запроса.
         """
         try:
-            # валидируем запрос к API
+            # Проверяем параметры запроса
             if not self.check_query_params(query_params):
-                response = {"Error": "Problem with query parameters"}
-            else:
+                response = {
+                    "status": "Error",
+                    "message": "Problem with query parameters."
+                }
+            else:   
                 user_text = query_params["user_text"]
                 questions_num = query_params["questions_num"]
-                
-                query_embed = self.bert_model.encode(query_text, convert_to_tensor=False).reshape(1, -1)
-                inds = self.find_close_embed_inds(query_embed, questions_num)
+                cls_option = query_params["cls_option"]
+
+                # Если пользователь выбрал классификатор, который незагружен
+                if cls_option == 'CatBoostClassifier' and self.cb_cls_model == None:
+                    message = 'CatBoostClassifier not found, query completed without classifier.'
+                    cls_option = 'None'
+                elif cls_option == 'Fine-tuned BERT' and self.bert_cls_nn == None:
+                    message = 'Fine-tuned BERT not found, query completed without classifier.'
+                    cls_option = 'None'
+                else:
+                    message = ''
+
+                start_time = time.time()
+                inds = self.find_similar_questions_inds(user_text, questions_num, cls_option)
                 similar_questions = self.questions.iloc[inds, :]['question'].values
                 
                 response = {
-                    "similar_questions": similar_questions
+                    'status': 'OK',
+                    "message": message,
+                    "similar_questions": list(similar_questions),
+                    'time': time.time() - start_time
                 }
+
         except Exception as e:
-            print(f"Error while handling request: {e}")
-            return {"Error": "Problem with request"}
+            return {
+                "status": "Error",
+                "message": f"Problem with request {e}"
+            }
         else:
             return response
         
@@ -194,13 +228,14 @@ if __name__ == "__main__":
     # Создаём параметры для тестового запроса
     test_params = {
         "user_text": "How do I check my blood sugar?",
-        "questions_num": 10
+        "questions_num": 10,
+        "cls_option": "No classifier"
     }
 
-    # создаём обработчик запросов для API
+    # Создаём обработчик запросов для API
     handler = FastApiHandler()
 
     # Делаем тестовый запрос
-    print(f"Searching {test_params['questions_num']} similar questions for the query:\n{test_params['user_text']}")
+    print(f"Searching {test_params['questions_num']} similar questions for text:\n{test_params['user_text']}\n")
     response = handler.handle(test_params)
     print(f"Response: {response}")
