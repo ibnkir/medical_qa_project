@@ -94,6 +94,7 @@ class FastApiHandler:
             self.bert_cls_nn = SentencePairClassifier()
             self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
             self.bert_cls_nn.load_state_dict(torch.load('../models/question_pairs_bert_classifier.pt', map_location=self.device))
+            self.bert_cls_nn.to(self.device)
         except Exception as e:
             self.bert_cls_nn = None
             print(f"Failed to load bert question pairs classifier: {e}")
@@ -144,7 +145,7 @@ class FastApiHandler:
         df_left = df_left.reset_index().drop(columns='index')
 
         ds_left = CustomDataset(df_left, with_labels=False)
-        left_loader = DataLoader(ds_left, batch_size=BATCH_SIZE, num_workers=0) # На локальном ПК без GPU лучше ставить num_workers=0
+        left_loader = DataLoader(ds_left, batch_size=BATCH_SIZE, num_workers=0) 
         left_preds = get_bert_preds(self.bert_cls_nn, self.device, left_loader)
 
         # Считаем предсказания для правых пар
@@ -154,7 +155,7 @@ class FastApiHandler:
         df_right = df_right.reset_index().drop(columns='index')
 
         ds_right = CustomDataset(df_right, with_labels=False)
-        right_loader = DataLoader(ds_right, batch_size=BATCH_SIZE, num_workers=0) # На локальном ПК без GPU лучше ставить num_workers=0
+        right_loader = DataLoader(ds_right, batch_size=BATCH_SIZE, num_workers=0) 
         right_preds = get_bert_preds(self.bert_cls_nn, self.device, right_loader)
 
         return left_preds, right_preds

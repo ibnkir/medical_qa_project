@@ -15,7 +15,7 @@ st.title('Similar Medical Questions Search')
 st.write(f"### {'Enter your question in English and how many similar medical questions to find:'}")
 
 user_text = st.text_area("Your question (150 characters limit): ", 
-                         value="How do I check my blood sugar?", 
+                         value="How to cope with stress?", 
                          max_chars=150, 
                          key="input")
 
