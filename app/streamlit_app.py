@@ -30,23 +30,25 @@ cls_option = st.selectbox(
     ("None", "CatBoostClassifier", "Fine-tuned BERT"))
 
 if st.button('Search') and user_text:
-    query_params = {
-        'user_text': user_text,
-        'questions_num': questions_num,
-        'cls_option': cls_option
-    }
+    with st.spinner('Search in process...'):
+        query_params = {
+            'user_text': user_text,
+            'questions_num': questions_num,
+            'cls_option': cls_option
+        }
     
-    state = st.text('Search in process...')
-    try:
-        response = requests.post(url="http://127.0.0.1:8081/similar_questions/", params=query_params)
-        response = response.json()
-        
-        if response['status'] == 'OK':
-            st.table(pd.DataFrame(response['similar_questions'], columns=['Similar Medical Questions']))
-            st.text(f"Total run time: {round(response['time'], 2)}")
-            state.text(f"Search is done. {response['message']}")
-        else:
-            state.text(f"Error: {response['message']}")
+        #state = st.text('Search in process...')
+    
+        try:
+            response = requests.post(url="http://127.0.0.1:8081/similar_questions/", params=query_params)
+            response = response.json()
+            
+            if response['status'] == 'OK':
+                st.table(pd.DataFrame(response['similar_questions'], columns=['Similar Medical Questions']))
+                st.text(f"Search is done. {response['message']}")
+                st.text(f"Total run time: {round(response['time'], 2)}")
+            else:
+                st.text(f"Error: {response['message']}")
 
-    except Exception as e:
-        state.text(f'Error: {e}')
+        except Exception as e:
+            st.text(f'Error: {e}')
