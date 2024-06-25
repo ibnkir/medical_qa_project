@@ -144,8 +144,9 @@ class FastApiHandler:
         df_left.fillna(query_text, inplace=True)
         df_left = df_left.reset_index().drop(columns='index')
 
-        ds_left = CustomDataset(df_left, with_labels=False)
-        left_loader = DataLoader(ds_left, batch_size=BATCH_SIZE, num_workers=0) 
+        # Plug: Передаем только 1 батч для ускорения работы BERT (временная мера)
+        ds_left = CustomDataset(df_left[:BATCH_SIZE], with_labels=False)
+        left_loader = DataLoader(ds_left, batch_size=BATCH_SIZE, num_workers=0)
         left_preds = get_bert_preds(self.bert_cls_nn, self.device, left_loader)
 
         # Считаем предсказания для правых пар
@@ -154,7 +155,8 @@ class FastApiHandler:
         df_right.fillna(query_text, inplace=True)
         df_right = df_right.reset_index().drop(columns='index')
 
-        ds_right = CustomDataset(df_right, with_labels=False)
+        # Plug: Передаем только 1 батч для ускорения работы BERT (временная мера)
+        ds_right = CustomDataset(df_right[:BATCH_SIZE], with_labels=False)
         right_loader = DataLoader(ds_right, batch_size=BATCH_SIZE, num_workers=0) 
         right_preds = get_bert_preds(self.bert_cls_nn, self.device, right_loader)
 
@@ -174,16 +176,18 @@ class FastApiHandler:
         """
         # Кодируем запрос
         query_embed = self.bert_model.encode(user_text, convert_to_tensor=False).reshape(1, -1)
+        
         # Находим расстояния от заданного вектора до всех остальных в корпусе вопросов
         dists = pairwise_distances(query_embed, self.bert_embeds, metric='cosine').squeeze()
         
+        # Индексы вопросов в порядке увеличения расстояния
+        close_embed_inds = np.argsort(dists)
+
         # Если расстояние до самого близкого вопроса меньше определенного значения, 
         # то считаем, что он совпадает с заданным вопросом и его можно игнорировать
         if dists[0] < 1:
-            close_embed_inds = np.argsort(dists)[1:]
-        else:
-            close_embed_inds = np.argsort(dists)
-
+            close_embed_inds = close_embed_inds[1:]
+        
         # Корректируем n
         n = min(n, len(close_embed_inds))
         
@@ -204,18 +208,24 @@ class FastApiHandler:
 
         for i, embed_idx in enumerate(close_embed_inds):
             # Проверяем предсказание для левой пары
-            if left_preds[i] == 1:
+            if i < len(left_preds) and left_preds[i] == 1:
                 res_inds.append(embed_idx)
                 labels_1_cnt += 1
             else:
                 # Проверяем предсказание для правой пары
-                if right_preds[i] == 1:
+                if i < len(right_preds) and right_preds[i] == 1:
                     res_inds.append(embed_idx)
                     labels_1_cnt += 1
                 else:
                     inds_labeled_0.append(embed_idx)
 
             if labels_1_cnt == n:
+                break
+
+            # Plug: Временная мера для ускорения работы BERT,
+            # когда делаем инференс не на всем датасете (н-р, только на одном батче)
+            if  i >= (len(left_preds) + len(right_preds)) \
+                and labels_1_cnt + len(inds_labeled_0) >= n:
                 break
 
         # Если количество найденных индексов с 1 оказалось меньше n, то добавляем индексы ближайших векторов,

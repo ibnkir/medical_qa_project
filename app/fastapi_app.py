@@ -11,7 +11,7 @@ uvicorn fastapi_app:app --reload --port 8081 --host 127.0.0.1
 Для просмотра документации API и совершения тестовых запросов через 
 Swagger UI зайти на  http://127.0.0.1:8081/docs
 
-либо запустить Streamlit-приложение (см. streamlit_app.py)
+Либо запустить Streamlit-приложение (см. streamlit_app.py).
 """
 
 import uvicorn
