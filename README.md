@@ -1,4 +1,4 @@
-# Учебный проект "Medical QA"
+# Проект "Medical QA"
 ## Выполнил: [Кирилл Н.](mailto:ibnkir@yandex.ru)
 
 ### Описание проекта
